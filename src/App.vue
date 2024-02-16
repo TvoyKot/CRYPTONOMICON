@@ -134,12 +134,15 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ selectedTicker.name }} - USD
         </h3>
-        <div class="flex items-end border-gray-600 border-b border-l h-64">
+        <div
+          ref="graph"
+          class="flex items-end border-gray-600 border-b border-l h-64"
+        >
           <div
             v-for="(bar, idx) in normalizedGraph"
             :key="idx"
-            :style="{ height: `${bar}%` }"
-            class="bg-purple-800 border w-10 h-24"
+            :style="{ height: `${bar}%`, width: `${bar}`}"
+            class="bg-yellow-800 border w-10"
           ></div>
         </div>
         <button
@@ -189,6 +192,7 @@ export default {
       selectedTicker: null,
 
       graph: [],
+      maxGraphElements: 1,
 
       page: 1,
     };
@@ -220,6 +224,12 @@ export default {
 
     setInterval(this.updateTickers, 5000);
   },
+  mounted() {
+    window.addEventListener('resize', this.calculateMaxGraphElements);
+  },
+  beforeUnmount() {
+    window.removeEventListener('resize', this.calculateMaxGraphElements);
+  },
 
   computed: {
     startIndex() {
@@ -231,7 +241,7 @@ export default {
     },
 
     filteredTickers() {
-      return this.tickers.filter((ticker) => ticker.name.includes(this.filter));
+      return this.tickers.filter((ticker) => ticker.name.includes(this.filter.toUpperCase()));
     },
 
     paginatedTickers() {
@@ -263,10 +273,22 @@ export default {
   },
 
   methods: {
+    calculateMaxGraphElements() {
+      if (!this.$refs.graph) {
+        return
+      } 
+      this.maxGraphElements = this.$refs.graph.clientWidth / 38;
+    },
     updateTicker(tickerName, price) {
       this.tickers
         .filter((t) => t.name === tickerName)
         .forEach((t) => {
+          if (t === this.selectedTicker) {
+            this.graph.push(price);
+            if (this.graph.length > this.maxGraphElements) {
+              this.graph.slice();
+            }
+          }
           t.price = price;
         });
     },
@@ -278,17 +300,6 @@ export default {
       return price > 1 ? price.toFixed(2) : price.toPrecision(2);
     },
 
-    async updateTickers() {
-      // if (!this.ticker.length) {
-      //   return;
-      // }
-      // const exchangeData = await loadTickers(this.tickers.map((t) => t.name));
-      // this.tickers.forEach((ticker) => {
-      //   const price = exchangeData[ticker.name.toUpperCase()];
-      //   ticker.price = price ?? "-";
-      // });
-    },
-
     add() {
       const currentTicker = {
         name: this.ticker,
@@ -298,8 +309,8 @@ export default {
       this.tickers = [...this.tickers, currentTicker];
       this.ticker = "";
       this.filter = "";
-      subscribeToTicker(currentTicker.name, newPrice =>
-          this.updateTicker(currentTicker.name, newPrice)
+      subscribeToTicker(currentTicker.name, (newPrice) =>
+        this.updateTicker(currentTicker.name, newPrice)
       );
     },
 
